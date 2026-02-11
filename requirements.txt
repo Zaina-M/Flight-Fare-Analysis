@@ -1,0 +1,31 @@
+# Flight Price Prediction - Dependencies
+# Install with: pip install -r requirements.txt
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Machine Learning
+scikit-learn>=1.3.0
+joblib>=1.3.0
+xgboost>=2.0.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Statistical Analysis
+scipy>=1.11.0
+statsmodels>=0.14.0
+
+# Web Application (Streamlit)
+streamlit>=1.28.0
+
+# REST API
+flask>=3.0.0
+
+# Testing
+pytest>=7.4.0
+
+# Logging and Utilities
+pathlib2>=2.3.7; python_version < "3.4"
