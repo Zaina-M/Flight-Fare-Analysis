@@ -25,12 +25,7 @@ class DataLoader:
     """
     
     def __init__(self, config=data_config):
-        """
-        Initialize DataLoader with configuration.
         
-        Args:
-            config: DataConfig instance with data parameters
-        """
         self.config = config
         logger.info("DataLoader initialized")
     
@@ -164,7 +159,7 @@ class DataCleaner:
         return df_cleaned
     
     def _drop_irrelevant_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Drop columns that are irrelevant for analysis."""
+        #Drop columns that are irrelevant for analysis.
         columns_to_drop = []
         
         for col in df.columns:
@@ -181,7 +176,7 @@ class DataCleaner:
         return df
     
     def _remove_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Remove duplicate rows."""
+        # Remove duplicate rows.
         duplicates = df.duplicated().sum()
         if duplicates > 0:
             logger.info(f"Removing {duplicates} duplicate rows")
@@ -318,7 +313,7 @@ class DataCleaner:
         return df
     
     def get_cleaning_report(self) -> Dict[str, Any]:
-        """Return the cleaning report with all transformations applied."""
+        # Return the cleaning report with all transformations applied.
         return self.cleaning_report
 
 
