@@ -3,14 +3,6 @@ Model Comparison and Evaluation Module.
 
 This module provides utilities for comparing multiple models,
 generating comparison reports, and visualizing performance differences.
-
-Implements Step 5.3 (Model Evaluation) and Step 6 (Model Interpretation) of the project.
-
-Industry Standard Justifications:
-- Standardized comparison framework ensures fair model evaluation
-- Cross-validation provides robust performance estimates
-- Statistical significance testing validates performance differences
-- Comprehensive visualization facilitates stakeholder communication
 """
 
 import numpy as np
@@ -52,23 +44,21 @@ class ModelComparison:
         self,
         models: Dict[str, BaseRegressor] = None,
         save_plots: bool = True,
-        plot_dir: Path = None
+        plot_dir: Path = None,
+        run_id: str = None
     ):
-        """
-        Initialize ModelComparison.
         
-        Args:
-            models: Dictionary of model name to model instance
-            save_plots: Whether to save plots to disk
-            plot_dir: Directory for saving plots
-        """
+       # Initialize ModelComparison.
+      
         self.models = models or {}
         self.results = {}
         self.cv_results = {}
         self.save_plots = save_plots
-        self.plot_dir = plot_dir or PLOTS_DIR
+        self.comparison_timestamp = run_id or datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Use run subfolder
+        base_dir = plot_dir or PLOTS_DIR
+        self.plot_dir = base_dir / f"run_{self.comparison_timestamp}"
         self.plot_dir.mkdir(parents=True, exist_ok=True)
-        self.comparison_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         logger.info(f"ModelComparison initialized with {len(self.models)} models")
     
     def add_model(self, name: str, model: BaseRegressor) -> None:
@@ -77,9 +67,9 @@ class ModelComparison:
         logger.info(f"Added model: {name}")
     
     def _save_figure(self, fig: plt.Figure, name: str) -> Optional[Path]:
-        """Save figure to disk with timestamp."""
+        """Save figure to disk (no timestamp in filename since folder has it)."""
         if self.save_plots:
-            filename = f"{name}_{self.comparison_timestamp}.png"
+            filename = f"{name}.png"
             filepath = self.plot_dir / filename
             fig.savefig(filepath, dpi=FIGURE_DPI, bbox_inches='tight',
                        facecolor='white', edgecolor='none')
@@ -94,16 +84,9 @@ class ModelComparison:
         X_train: Union[pd.DataFrame, np.ndarray],
         y_train: Union[pd.Series, np.ndarray]
     ) -> Dict[str, BaseRegressor]:
-        """
-        Train all models in the comparison.
         
-        Args:
-            X_train: Training features
-            y_train: Training target
+        # Train all models in the comparison.
         
-        Returns:
-            Dictionary of trained models
-        """
         logger.info("=" * 60)
         logger.info("Training All Models")
         logger.info("=" * 60)
@@ -123,16 +106,9 @@ class ModelComparison:
         X_test: Union[pd.DataFrame, np.ndarray],
         y_test: Union[pd.Series, np.ndarray]
     ) -> pd.DataFrame:
-        """
-        Evaluate all trained models on test data.
         
-        Args:
-            X_test: Test features
-            y_test: Test target
-        
-        Returns:
-            DataFrame with evaluation metrics for all models
-        """
+        # Evaluate all trained models on test data.
+     
         logger.info("=" * 60)
         logger.info("Evaluating All Models")
         logger.info("=" * 60)
@@ -178,17 +154,9 @@ class ModelComparison:
         y: Union[pd.Series, np.ndarray],
         cv: int = None
     ) -> pd.DataFrame:
-        """
-        Perform cross-validation for all models.
         
-        Args:
-            X: Features
-            y: Target
-            cv: Number of folds
+        # Perform cross-validation for all models.
         
-        Returns:
-            DataFrame with cross-validation results
-        """
         cv = cv or model_config.cv_folds
         
         logger.info("=" * 60)
@@ -396,67 +364,66 @@ class ModelComparison:
     def plot_predictions_comparison(
         self,
         y_test: Union[pd.Series, np.ndarray],
-        top_n: int = 4
+        top_n: int = 1
     ) -> Optional[Path]:
         """
-        Plot actual vs predicted for top N models.
+        Plot Predicted vs Actual Fares scatter plot for best model.
         
         Args:
             y_test: True target values
-            top_n: Number of top models to plot
+            top_n: Number of top models to plot (1 = best model only)
         
         Returns:
             Path to saved plot
         """
         if not self.results:
+            logger.warning("No results available for predictions comparison")
             return None
         
-        logger.info(f"Generating predictions comparison plot for top {top_n} models...")
+        logger.info("Generating Predicted vs Actual Fares scatter plot...")
         
-        # Sort models by R2 and get top N
+        # Get best model
         sorted_models = sorted(
             self.results.items(),
             key=lambda x: x[1]['metrics']['R2'],
             reverse=True
         )[:top_n]
         
-        fig, axes = plt.subplots(2, 2, figsize=(14, 12))
-        axes = axes.flatten()
+        if not sorted_models:
+            logger.warning("No models found for predictions comparison")
+            return None
+        
+        fig, ax = plt.subplots(figsize=(10, 8))
         
         y_true = np.array(y_test)
+        name, result = sorted_models[0]
+        y_pred = result['predictions']
         
-        for idx, (name, result) in enumerate(sorted_models):
-            ax = axes[idx]
-            y_pred = result['predictions']
-            
-            ax.scatter(y_true, y_pred, alpha=0.5, edgecolors='white', linewidth=0.5)
-            
-            # Perfect prediction line
-            min_val = min(y_true.min(), y_pred.min())
-            max_val = max(y_true.max(), y_pred.max())
-            ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2)
-            
-            # Add metrics
-            r2 = result['metrics']['R2']
-            rmse = result['metrics']['RMSE']
-            textstr = f'$R^2$ = {r2:.4f}\nRMSE = {rmse:,.2f}'
-            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-            ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=10,
-                   verticalalignment='top', bbox=props)
-            
-            ax.set_xlabel('Actual', fontsize=11)
-            ax.set_ylabel('Predicted', fontsize=11)
-            ax.set_title(name, fontsize=12, fontweight='bold')
-            ax.grid(True, alpha=0.3)
+        # Scatter plot
+        ax.scatter(y_true, y_pred, alpha=0.5, edgecolors='white', linewidth=0.5, s=30, c='steelblue')
         
-        # Hide empty subplots
-        for idx in range(len(sorted_models), len(axes)):
-            axes[idx].set_visible(False)
+        # Perfect prediction line
+        min_val = min(y_true.min(), y_pred.min())
+        max_val = max(y_true.max(), y_pred.max())
+        ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2, label='Perfect Prediction')
         
-        fig.suptitle('Actual vs Predicted: Top Models', fontsize=14, fontweight='bold', y=1.02)
+        # Add metrics annotation
+        r2 = result['metrics']['R2']
+        rmse = result['metrics']['RMSE']
+        mae = result['metrics']['MAE']
+        textstr = f'Model: {name}\n$R^2$ = {r2:.4f}\nRMSE = {rmse:,.2f}\nMAE = {mae:,.2f}'
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+        ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
+               verticalalignment='top', bbox=props)
+        
+        ax.set_xlabel('Actual Fares', fontsize=12)
+        ax.set_ylabel('Predicted Fares', fontsize=12)
+        ax.set_title('Predicted vs Actual Fares', fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10)
+        ax.grid(True, alpha=0.3)
+        
         plt.tight_layout()
-        
-        return self._save_figure(fig, 'predictions_comparison')
+        return self._save_figure(fig, 'predicted_vs_actual')
     
     def plot_bias_variance_tradeoff(
         self,
@@ -503,7 +470,7 @@ class ModelComparison:
         for idx, row in cv_df.iterrows():
             gap = row['Train_R2_Mean'] - row['R2_Mean']
             if gap > 0.1:  # Significant overfitting
-                ax.annotate('⚠️', xy=(idx, row['Train_R2_Mean']),
+                ax.annotate('', xy=(idx, row['Train_R2_Mean']),
                            fontsize=14, ha='center', va='bottom')
         
         plt.tight_layout()
@@ -568,7 +535,7 @@ class ModelComparison:
         
         # Test Set Results
         report_lines.extend([
-            "📊 TEST SET PERFORMANCE",
+            " TEST SET PERFORMANCE",
             "-" * 50,
         ])
         
@@ -586,7 +553,7 @@ class ModelComparison:
         # Cross-Validation Results
         if cv_df is not None and not cv_df.empty:
             report_lines.extend([
-                "📈 CROSS-VALIDATION PERFORMANCE",
+                " CROSS-VALIDATION PERFORMANCE",
                 "-" * 50,
             ])
             
@@ -691,24 +658,13 @@ class ModelComparison:
         if run_cv:
             results['cv_results'] = self.cross_validate_all_models(X_train, y_train)
         
-        # Generate consolidated plots (fewer, more informative)
-        plot_methods = [
-            lambda: self.plot_all_metrics_comparison(results['test_results']),
-            lambda: self.plot_predictions_comparison(y_test),
-        ]
-        
-        if run_cv:
-            plot_methods.extend([
-                lambda: self.plot_bias_variance_tradeoff(results['cv_results']),
-            ])
-        
-        for plot_method in plot_methods:
-            try:
-                plot_path = plot_method()
-                if plot_path:
-                    results['plots'].append(plot_path)
-            except Exception as e:
-                logger.error(f"Error generating plot: {e}")
+        # Generate Predicted vs Actual plot (Plot 6 of 6 required visualizations)
+        try:
+            plot_path = self.plot_predictions_comparison(y_test)
+            if plot_path:
+                results['plots'].append(plot_path)
+        except Exception as e:
+            logger.error(f"Error generating predicted vs actual plot: {e}")
         
         # Generate report
         results['report'] = self.generate_comparison_report(
