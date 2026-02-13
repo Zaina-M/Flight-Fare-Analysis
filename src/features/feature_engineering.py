@@ -4,11 +4,6 @@ Feature Engineering Module.
 This module handles all feature transformation, encoding, and scaling operations.
 Implements Step 2B (Feature Engineering) of the project.
 
-Industry Standard Justifications:
-- Sklearn pipelines ensure consistent transformations across train/test
-- Feature preprocessing is fitted on training data only to prevent data leakage
-- All transformations are logged for reproducibility and debugging
-- Transformers are saved for inference consistency
 """
 
 import pandas as pd
@@ -49,25 +44,14 @@ class DateFeatureExtractor:
     }
     
     def __init__(self, date_column: str = None):
-        """
-        Initialize DateFeatureExtractor.
-        
-        Args:
-            date_column: Name of the date column
-        """
+        # Initialize DateFeatureExtractor.
+       
         self.date_column = date_column or data_config.date_column
         logger.info(f"DateFeatureExtractor initialized for column: {self.date_column}")
     
     def extract_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Extract temporal features from the date column.
-        
-        Args:
-            df: Input DataFrame with date column
-        
-        Returns:
-            DataFrame with new temporal features
-        """
+        # Extract temporal features from the date column.
+       
         df = df.copy()
         
         if self.date_column not in df.columns:
@@ -117,14 +101,15 @@ class RouteFeatureExtractor:
     on rare routes while preserving target signal.
     """
     
-    def __init__(self, target_column: str = None, smoothing: float = 10.0):
-        """Initialize RouteFeatureExtractor."""
+    def __init__(self, target_column: str = None, smoothing: float = 50.0):
+        # Initialize RouteFeatureExtractor.
+        
         self.target_column = target_column or data_config.target_column
         self.route_stats = None
         self.global_stats = {}  # Fallback values for unseen routes
         self.global_mean = 0.0
         self.smoothing = smoothing  # Smoothing factor for target encoding
-        logger.info("RouteFeatureExtractor initialized (smoothed target encoding)")
+        logger.info(f"RouteFeatureExtractor initialized (smoothed target encoding, smoothing={smoothing})")
     
     def fit(self, df: pd.DataFrame) -> 'RouteFeatureExtractor':
         """
@@ -133,11 +118,6 @@ class RouteFeatureExtractor:
         Uses Bayesian smoothed mean: 
             encoded = (count * route_mean + smoothing * global_mean) / (count + smoothing)
         
-        Args:
-            df: Training DataFrame
-        
-        Returns:
-            self
         """
         if 'Source' in df.columns and 'Destination' in df.columns:
             df = df.copy()
@@ -177,36 +157,29 @@ class RouteFeatureExtractor:
         return self
     
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Transform DataFrame by adding smoothed route features.
+        # Transform DataFrame by adding smoothed route features.
         
-        Args:
-            df: Input DataFrame
-        
-        Returns:
-            DataFrame with route features
-        """
         df = df.copy()
         
         if 'Source' in df.columns and 'Destination' in df.columns:
             df['Route'] = df['Source'] + '_to_' + df['Destination']
             
             if self.route_stats is not None:
-                # Merge only the smoothed columns (not raw mean to prevent leakage)
+                # IMPORTANT: Only use Route_Count (frequency), NOT Route_Encoded_Fare
+                # Route_Encoded_Fare encodes target (fare) information and causes leakage
+                # This was the cause of predictions being wildly off from actual values
                 merge_cols = ['Route']
-                for col in ['Route_Encoded_Fare', 'Route_Std_Fare', 'Route_Count']:
-                    if col in self.route_stats.columns:
-                        merge_cols.append(col)
+                if 'Route_Count' in self.route_stats.columns:
+                    merge_cols.append('Route_Count')
                 
                 df = df.merge(self.route_stats[merge_cols], on='Route', how='left')
                 
-                # Fill missing route stats with global fallbacks
-                for col in ['Route_Encoded_Fare', 'Route_Std_Fare', 'Route_Count']:
-                    if col in df.columns:
-                        fallback = getattr(self, 'global_stats', {}).get(col, 0)
-                        df[col] = df[col].fillna(fallback)
+                # Fill missing route count with median
+                if 'Route_Count' in df.columns:
+                    fallback = getattr(self, 'global_stats', {}).get('Route_Count', 100)
+                    df['Route_Count'] = df['Route_Count'].fillna(fallback)
             
-            logger.info("Added smoothed route target-encoding features")
+            logger.info("Added route frequency features (no target encoding to prevent leakage)")
         
         return df
     
@@ -228,13 +201,8 @@ class FeatureEncoder:
         encoding_type: str = 'onehot',
         categorical_columns: List[str] = None
     ):
-        """
-        Initialize FeatureEncoder.
-        
-        Args:
-            encoding_type: 'onehot' or 'label'
-            categorical_columns: List of columns to encode
-        """
+        # Initialize FeatureEncoder.
+      
         self.encoding_type = encoding_type
         self.categorical_columns = categorical_columns or data_config.categorical_columns
         self.encoders = {}
@@ -242,15 +210,8 @@ class FeatureEncoder:
         logger.info(f"FeatureEncoder initialized with {encoding_type} encoding")
     
     def fit(self, df: pd.DataFrame) -> 'FeatureEncoder':
-        """
-        Fit encoders on the training data.
+        # Fit encoders on the training data.
         
-        Args:
-            df: Training DataFrame
-        
-        Returns:
-            self
-        """
         for col in self.categorical_columns:
             if col not in df.columns:
                 continue
@@ -268,15 +229,8 @@ class FeatureEncoder:
         return self
     
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Transform categorical columns using fitted encoders.
+        # Transform categorical columns using fitted encoders.
         
-        Args:
-            df: Input DataFrame
-        
-        Returns:
-            DataFrame with encoded categorical columns
-        """
         df = df.copy()
         
         for col in self.categorical_columns:
@@ -317,13 +271,8 @@ class FeatureScaler:
         scaling_type: str = 'standard',
         numerical_columns: List[str] = None
     ):
-        """
-        Initialize FeatureScaler.
-        
-        Args:
-            scaling_type: 'standard' or 'minmax'
-            numerical_columns: List of columns to scale
-        """
+        # Initialize FeatureScaler.
+       
         self.scaling_type = scaling_type
         self.numerical_columns = numerical_columns or data_config.numerical_columns
         
@@ -336,15 +285,8 @@ class FeatureScaler:
         logger.info(f"FeatureScaler initialized with {scaling_type} scaling")
     
     def fit(self, df: pd.DataFrame) -> 'FeatureScaler':
-        """
-        Fit scaler on training data.
+        # Fit scaler on training data.
         
-        Args:
-            df: Training DataFrame
-        
-        Returns:
-            self
-        """
         cols_to_scale = [col for col in self.numerical_columns if col in df.columns]
         
         if cols_to_scale:
@@ -355,15 +297,8 @@ class FeatureScaler:
         return self
     
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Scale numerical columns using fitted scaler.
+        # Scale numerical columns using fitted scaler.
         
-        Args:
-            df: Input DataFrame
-        
-        Returns:
-            DataFrame with scaled numerical columns
-        """
         if not self.is_fitted:
             raise ValueError("FeatureScaler must be fitted before transform")
         
@@ -408,14 +343,8 @@ class FeatureEngineer:
         scaling_type: str = 'standard',
         config=data_config
     ):
-        """
-        Initialize FeatureEngineer.
+        # Initialize FeatureEngineer.
         
-        Args:
-            encoding_type: Type of categorical encoding
-            scaling_type: Type of numerical scaling
-            config: DataConfig instance
-        """
         self.config = config
         self.date_extractor = DateFeatureExtractor()
         self.route_extractor = RouteFeatureExtractor(target_column=config.target_column)
@@ -428,16 +357,8 @@ class FeatureEngineer:
         logger.info("FeatureEngineer initialized")
     
     def fit(self, df: pd.DataFrame, y: pd.Series = None) -> 'FeatureEngineer':
-        """
-        Fit all transformers on training data.
-        
-        Args:
-            df: Training features DataFrame
-            y: Training target (optional, used for route statistics)
-        
-        Returns:
-            self
-        """
+        # Fit all transformers on training data.
+       
         logger.info("Fitting FeatureEngineer on training data...")
         
         # Include target for route statistics if available
@@ -468,16 +389,9 @@ class FeatureEngineer:
         return self
     
     def transform(self, df: pd.DataFrame, scale_features: bool = True) -> pd.DataFrame:
-        """
-        Transform features using fitted transformers.
         
-        Args:
-            df: Input DataFrame
-            scale_features: Whether to apply scaling
+         # Transform features using fitted transformers.
         
-        Returns:
-            Transformed DataFrame
-        """
         if not self.is_fitted:
             raise ValueError("FeatureEngineer must be fitted before transform")
         
@@ -542,11 +456,8 @@ class FeatureEngineer:
         if 'Duration (hrs)' in df.columns and 'IsWeekend' in df.columns:
             df['Duration_x_Weekend'] = df['Duration (hrs)'] * df['IsWeekend']
         
-        # Route encoded fare × Days Before (route pricing changes with booking window)
-        if 'Route_Encoded_Fare' in df.columns and 'Days Before Departure' in df.columns:
-            df['RouteFare_x_DaysBefore'] = df['Route_Encoded_Fare'] * df['Days Before Departure']
         
-        logger.info("Added interaction features")
+        logger.info("Added interaction features (without target-encoded interactions)")
         return df
     
     def fit_transform(
@@ -579,15 +490,9 @@ class FeatureEngineer:
     
     @classmethod
     def load(cls, path: Path = None) -> 'FeatureEngineer':
-        """
-        Load a fitted FeatureEngineer from disk.
         
-        Args:
-            path: Path to the saved transformer
+       # Load a fitted FeatureEngineer from disk.
         
-        Returns:
-            Loaded FeatureEngineer instance
-        """
         if path is None:
             path = MODELS_DIR / "feature_engineer.pkl"
         
