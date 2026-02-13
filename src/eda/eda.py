@@ -32,33 +32,20 @@ FIGURE_FORMAT = 'png'
 class ExploratoryDataAnalyzer:
     # Comprehensive EDA class for flight price data.
     
-    def __init__(self, save_plots: bool = True, plot_dir: Path = None):
-        """
-        Initialize ExploratoryDataAnalyzer.
+    def __init__(self, save_plots: bool = True, plot_dir: Path = None, run_id: str = None):
         
-        Args:
-            save_plots: Whether to save plots to disk
-            plot_dir: Directory for saving plots
-        """
         self.save_plots = save_plots
-        self.plot_dir = plot_dir or PLOTS_DIR
+        self.analysis_timestamp = run_id or datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Create a subfolder for this run
+        base_dir = plot_dir or PLOTS_DIR
+        self.plot_dir = base_dir / f"run_{self.analysis_timestamp}"
         self.plot_dir.mkdir(parents=True, exist_ok=True)
-        self.analysis_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         logger.info(f"EDA Analyzer initialized. Plots will be saved to: {self.plot_dir}")
     
     def _save_figure(self, fig: plt.Figure, name: str) -> Optional[Path]:
-        """
-        Save figure to disk with timestamp.
-        
-        Args:
-            fig: Matplotlib figure to save
-            name: Base name for the file
-        
-        Returns:
-            Path to saved figure or None
-        """
+        # Save figure to disk (no timestamp in filename since folder has timestamp).
         if self.save_plots:
-            filename = f"{name}_{self.analysis_timestamp}.{FIGURE_FORMAT}"
+            filename = f"{name}.{FIGURE_FORMAT}"
             filepath = self.plot_dir / filename
             fig.savefig(filepath, dpi=FIGURE_DPI, bbox_inches='tight', 
                        facecolor='white', edgecolor='none')
@@ -69,15 +56,7 @@ class ExploratoryDataAnalyzer:
         return None
     
     def descriptive_statistics(self, df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-        """
-        Generate comprehensive descriptive statistics.
-        
-        Args:
-            df: Input DataFrame
-        
-        Returns:
-            Dictionary containing various statistical summaries
-        """
+        # Generate comprehensive descriptive statistics.
         logger.info("Computing descriptive statistics...")
         
         stats_dict = {}
@@ -125,16 +104,9 @@ class ExploratoryDataAnalyzer:
         df: pd.DataFrame, 
         method: str = 'pearson'
     ) -> Tuple[pd.DataFrame, Optional[Path]]:
-        """
-        Compute and visualize correlation matrix.
-        
-        Args:
-            df: Input DataFrame
-            method: Correlation method ('pearson', 'spearman', 'kendall')
-        
-        Returns:
-            Correlation matrix DataFrame and path to saved plot
-        """
+       
+    # Compute and visualize correlation matrix.
+       
         logger.info(f"Computing {method} correlation matrix...")
         
         # Select numerical columns
@@ -182,15 +154,8 @@ class ExploratoryDataAnalyzer:
         return corr_matrix, plot_path
     
     def plot_fare_distributions(self, df: pd.DataFrame) -> List[Path]:
-        """
-        Plot distribution of fare-related columns.
-        
-        Args:
-            df: Input DataFrame
-        
-        Returns:
-            List of paths to saved plots
-        """
+        # Plot distribution of fare-related columns.
+       
         logger.info("Generating fare distribution plots...")
         saved_plots = []
         
@@ -250,15 +215,7 @@ class ExploratoryDataAnalyzer:
         return saved_plots
     
     def plot_fare_by_airline(self, df: pd.DataFrame) -> Optional[Path]:
-        """
-        Plot average fare by airline.
-        
-        Args:
-            df: Input DataFrame
-        
-        Returns:
-            Path to saved plot
-        """
+        # Plot average fare by airline.
         if 'Airline' not in df.columns or 'Total Fare' not in df.columns:
             logger.warning("Required columns not found for airline fare plot")
             return None
@@ -304,15 +261,8 @@ class ExploratoryDataAnalyzer:
         return self._save_figure(fig, 'fare_by_airline')
     
     def plot_fare_variation_across_airlines(self, df: pd.DataFrame) -> Optional[Path]:
-        """
-        Create boxplot showing fare variation across airlines.
+        # Create boxplot showing fare variation across airlines.
         
-        Args:
-            df: Input DataFrame
-        
-        Returns:
-            Path to saved plot
-        """
         if 'Airline' not in df.columns or 'Total Fare' not in df.columns:
             logger.warning("Required columns not found for airline boxplot")
             return None
@@ -350,15 +300,8 @@ class ExploratoryDataAnalyzer:
         return self._save_figure(fig, 'fare_boxplot_airlines')
     
     def plot_fare_by_season(self, df: pd.DataFrame) -> Optional[Path]:
-        """
-        Create boxplot showing fare variation across seasons.
-        
-        Args:
-            df: Input DataFrame
-        
-        Returns:
-            Path to saved plot
-        """
+        # Create boxplot showing fare variation across seasons.
+      
         if 'Season' not in df.columns or 'Total Fare' not in df.columns:
             logger.warning("Season or Total Fare column not found")
             return None
@@ -401,15 +344,8 @@ class ExploratoryDataAnalyzer:
         return self._save_figure(fig, 'fare_by_season')
     
     def plot_fare_by_month(self, df: pd.DataFrame) -> Optional[Path]:
-        """
-        Plot average fare trend by month.
-        
-        Args:
-            df: Input DataFrame
-        
-        Returns:
-            Path to saved plot
-        """
+        # Plot average fare trend by month.
+      
         if 'Month' not in df.columns or 'Total Fare' not in df.columns:
             logger.warning("Month or Total Fare column not found")
             return None
@@ -458,16 +394,8 @@ class ExploratoryDataAnalyzer:
         return self._save_figure(fig, 'fare_by_month')
     
     def plot_route_analysis(self, df: pd.DataFrame, top_n: int = 10) -> Optional[Path]:
-        """
-        Analyze and plot top routes by frequency and fare.
+        # Analyze and plot top routes by frequency and fare.
         
-        Args:
-            df: Input DataFrame
-            top_n: Number of top routes to display
-        
-        Returns:
-            Path to saved plot
-        """
         if 'Source' not in df.columns or 'Destination' not in df.columns:
             logger.warning("Source or Destination column not found")
             return None
@@ -511,23 +439,20 @@ class ExploratoryDataAnalyzer:
     
     def run_full_eda(self, df: pd.DataFrame) -> Dict[str, Any]:
         """
-        Execute streamlined EDA pipeline with consolidated, explanatory plots.
-        
-        Generates fewer but more informative multi-panel figures instead of
-        many separate single-purpose plots.
-        
-        Args:
-            df: Input DataFrame
-        
-        Returns:
-            Dictionary containing all EDA results and plot paths
+        Execute EDA pipeline generating exactly 4 required visualizations:
+        1. Average Fare by Airline (bar chart)
+        2. Total Fare Distribution (histogram)
+        3. Fare Variation Across Seasons (boxplot)
+        4. Feature Correlation Heatmap
         """
         logger.info("=" * 60)
         logger.info("Starting Exploratory Data Analysis")
+        logger.info(f"Plots will be saved to: {self.plot_dir}")
         logger.info("=" * 60)
         
         results = {
             'timestamp': self.analysis_timestamp,
+            'run_folder': str(self.plot_dir),
             'data_shape': df.shape,
             'statistics': {},
             'plots': []
@@ -536,41 +461,128 @@ class ExploratoryDataAnalyzer:
         # Generate statistics
         results['statistics'] = self.descriptive_statistics(df)
         
-        # Correlation analysis (1 plot)
-        corr_matrix, corr_plot = self.correlation_analysis(df)
-        results['correlation_matrix'] = corr_matrix
-        if corr_plot:
-            results['plots'].append(corr_plot)
-        
-        # Consolidated pricing overview (1 multi-panel plot)
+        # Plot 1: Feature Correlation Heatmap
         try:
-            overview_path = self._plot_pricing_overview(df)
-            if overview_path:
-                results['plots'].append(overview_path)
+            corr_matrix, corr_plot = self.correlation_analysis(df)
+            results['correlation_matrix'] = corr_matrix
+            if corr_plot:
+                results['plots'].append(corr_plot)
         except Exception as e:
-            logger.error(f"Error in pricing overview: {e}")
+            logger.error(f"Error in correlation heatmap: {e}")
         
-        # Consolidated temporal analysis (1 multi-panel plot)
+        # Plot 2: Total Fare Distribution (histogram)
         try:
-            temporal_path = self._plot_temporal_analysis(df)
-            if temporal_path:
-                results['plots'].append(temporal_path)
+            dist_plot = self._plot_fare_distribution(df)
+            if dist_plot:
+                results['plots'].append(dist_plot)
         except Exception as e:
-            logger.error(f"Error in temporal analysis: {e}")
+            logger.error(f"Error in fare distribution: {e}")
         
-        # Route analysis (1 plot)
+        # Plot 3: Average Fare by Airline (bar chart)
         try:
-            route_path = self.plot_route_analysis(df, top_n=10)
-            if route_path:
-                results['plots'].append(route_path)
+            airline_plot = self._plot_fare_by_airline_bar(df)
+            if airline_plot:
+                results['plots'].append(airline_plot)
         except Exception as e:
-            logger.error(f"Error in route analysis: {e}")
+            logger.error(f"Error in fare by airline: {e}")
+        
+        # Plot 4: Fare Variation Across Seasons (boxplot)
+        try:
+            season_plot = self._plot_fare_by_season_boxplot(df)
+            if season_plot:
+                results['plots'].append(season_plot)
+        except Exception as e:
+            logger.error(f"Error in fare by season: {e}")
         
         logger.info("=" * 60)
-        logger.info(f"EDA Complete. Generated {len(results['plots'])} consolidated plots")
+        logger.info(f"EDA Complete. Generated {len(results['plots'])} plots in {self.plot_dir}")
         logger.info("=" * 60)
         
         return results
+    
+    def _plot_fare_distribution(self, df: pd.DataFrame) -> Optional[Path]:
+        """Plot 2: Total Fare Distribution (histogram with KDE)."""
+        if 'Total Fare' not in df.columns:
+            return None
+        
+        logger.info("Generating Total Fare Distribution histogram...")
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        data = df['Total Fare'].dropna()
+        
+        ax.hist(data, bins=50, density=True, alpha=0.7, color='steelblue', edgecolor='white')
+        
+        # Add KDE
+        try:
+            kde_x = np.linspace(data.min(), data.max(), 100)
+            kde = stats.gaussian_kde(data)
+            ax.plot(kde_x, kde(kde_x), 'r-', linewidth=2, label='KDE')
+        except Exception:
+            pass
+        
+        # Add mean and median
+        ax.axvline(data.mean(), color='green', linestyle='--', lw=2, label=f'Mean: {data.mean():,.0f}')
+        ax.axvline(data.median(), color='orange', linestyle='--', lw=2, label=f'Median: {data.median():,.0f}')
+        
+        ax.set_xlabel('Total Fare (BDT)', fontsize=12)
+        ax.set_ylabel('Density', fontsize=12)
+        ax.set_title('Total Fare Distribution', fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10)
+        
+        plt.tight_layout()
+        return self._save_figure(fig, 'fare_distribution')
+    
+    def _plot_fare_by_airline_bar(self, df: pd.DataFrame) -> Optional[Path]:
+        """Plot 3: Average Fare by Airline (bar chart)."""
+        if 'Airline' not in df.columns or 'Total Fare' not in df.columns:
+            return None
+        
+        logger.info("Generating Average Fare by Airline bar chart...")
+        
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        airline_fares = df.groupby('Airline')['Total Fare'].mean().sort_values(ascending=True)
+        colors = plt.cm.viridis(np.linspace(0.2, 0.8, len(airline_fares)))
+        
+        bars = ax.barh(airline_fares.index, airline_fares.values, color=colors, edgecolor='white')
+        
+        # Add value labels
+        for bar in bars:
+            width = bar.get_width()
+            ax.text(width + airline_fares.max() * 0.01, bar.get_y() + bar.get_height()/2,
+                   f'{width:,.0f}', va='center', fontsize=9)
+        
+        ax.axvline(df['Total Fare'].mean(), color='red', linestyle='--', 
+                  linewidth=2, label=f"Overall Mean: {df['Total Fare'].mean():,.0f}")
+        
+        ax.set_xlabel('Average Total Fare (BDT)', fontsize=12)
+        ax.set_ylabel('Airline', fontsize=12)
+        ax.set_title('Average Fare by Airline', fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10)
+        
+        plt.tight_layout()
+        return self._save_figure(fig, 'fare_by_airline')
+    
+    def _plot_fare_by_season_boxplot(self, df: pd.DataFrame) -> Optional[Path]:
+        """Plot 4: Fare Variation Across Seasons (boxplot)."""
+        if 'Season' not in df.columns or 'Total Fare' not in df.columns:
+            return None
+        
+        logger.info("Generating Fare by Season boxplot...")
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        season_order = [s for s in ['Winter', 'Summer', 'Monsoon', 'Autumn'] if s in df['Season'].unique()]
+        
+        sns.boxplot(data=df, x='Season', y='Total Fare', order=season_order,
+                   palette='coolwarm', ax=ax)
+        
+        ax.set_xlabel('Season', fontsize=12)
+        ax.set_ylabel('Total Fare (BDT)', fontsize=12)
+        ax.set_title('Fare Variation Across Seasons', fontsize=14, fontweight='bold')
+        
+        plt.tight_layout()
+        return self._save_figure(fig, 'fare_by_season')
     
     def _plot_pricing_overview(self, df: pd.DataFrame) -> Optional[Path]:
         """
@@ -770,7 +782,7 @@ class KPICalculator:
         # Overall Pricing
         if 'overall_avg_fare' in kpis:
             report_lines.extend([
-                "📊 OVERALL PRICING METRICS",
+                " OVERALL PRICING METRICS",
                 "-" * 40,
                 f"  Average Fare:     BDT {kpis['overall_avg_fare']:,.2f}",
                 f"  Median Fare:      BDT {kpis['overall_median_fare']:,.2f}",
@@ -782,7 +794,7 @@ class KPICalculator:
         # Airline Insights
         if 'best_value_airline' in kpis:
             report_lines.extend([
-                "✈️ AIRLINE INSIGHTS",
+                " AIRLINE INSIGHTS",
                 "-" * 40,
                 f"  Best Value Airline:    {kpis['best_value_airline']}",
                 f"  Premium Airline:       {kpis['premium_airline']}",
@@ -792,7 +804,7 @@ class KPICalculator:
         # Route Analysis
         if 'most_popular_route' in kpis:
             report_lines.extend([
-                "🗺️ ROUTE ANALYSIS",
+                " ROUTE ANALYSIS",
                 "-" * 40,
                 f"  Most Popular Route:    {kpis['most_popular_route']}",
                 f"                         ({kpis['most_popular_route_count']:,} flights)",
@@ -803,7 +815,7 @@ class KPICalculator:
         # Top 5 Expensive Routes
         if 'top_5_expensive_routes' in kpis:
             report_lines.extend([
-                "💰 TOP 5 MOST EXPENSIVE ROUTES",
+                " TOP 5 MOST EXPENSIVE ROUTES",
                 "-" * 40,
             ])
             for i, (route, fare) in enumerate(kpis['top_5_expensive_routes'].items(), 1):
@@ -813,7 +825,7 @@ class KPICalculator:
         # Seasonal Patterns
         if 'peak_season' in kpis:
             report_lines.extend([
-                "📅 SEASONAL PATTERNS",
+                " SEASONAL PATTERNS",
                 "-" * 40,
                 f"  Peak Season:           {kpis['peak_season']}",
                 f"  Low Season:            {kpis['low_season']}",
@@ -824,7 +836,7 @@ class KPICalculator:
         # Day of Week Patterns
         if 'cheapest_day' in kpis:
             report_lines.extend([
-                "📆 DAY OF WEEK PATTERNS",
+                " DAY OF WEEK PATTERNS",
                 "-" * 40,
                 f"  Cheapest Day:          {kpis['cheapest_day']}",
                 f"  Most Expensive Day:    {kpis['most_expensive_day']}",
@@ -834,7 +846,7 @@ class KPICalculator:
         # Tax Analysis
         if 'avg_tax_percentage' in kpis:
             report_lines.extend([
-                "💵 TAX ANALYSIS",
+                " TAX ANALYSIS",
                 "-" * 40,
                 f"  Average Tax Percentage: {kpis['avg_tax_percentage']:.1f}%",
                 ""
@@ -852,16 +864,8 @@ class KPICalculator:
         return report
     
     def save_kpi_report(self, kpis: Dict[str, Any], filename: str = None) -> Path:
-        """
-        Save KPI report to file.
+        # Save KPI report to file.
         
-        Args:
-            kpis: Dictionary of computed KPIs
-            filename: Optional filename for the report
-        
-        Returns:
-            Path to saved report
-        """
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"kpi_report_{timestamp}.txt"
