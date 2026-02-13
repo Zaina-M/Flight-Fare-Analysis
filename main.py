@@ -169,14 +169,20 @@ def step_2_clean_and_engineer_features(
     return X_train, X_test, y_train, y_test, feature_engineer, df_with_features
 
 
-def step_3_exploratory_data_analysis(df):
+def step_3_exploratory_data_analysis(df, run_id: str = None):
     """
     Step 3: Exploratory Data Analysis.
     
     Perform comprehensive EDA with visualizations and KPI calculation.
+    Generates 4 of 6 required visualizations:
+    - Correlation Heatmap
+    - Fare Distribution
+    - Fare by Airline
+    - Fare by Season
     
     Args:
         df: Cleaned DataFrame with features
+        run_id: Unique identifier for this pipeline run
     
     Returns:
         Dictionary with EDA results
@@ -189,7 +195,7 @@ def step_3_exploratory_data_analysis(df):
     
     # Run full EDA
     logger.info("\n Running Exploratory Data Analysis...")
-    eda = ExploratoryDataAnalyzer(save_plots=True)
+    eda = ExploratoryDataAnalyzer(save_plots=True, run_id=run_id)
     eda_results = eda.run_full_eda(df)
     
     # Calculate KPIs
@@ -204,11 +210,12 @@ def step_3_exploratory_data_analysis(df):
     # Save KPI report
     kpi_calculator.save_kpi_report(kpis)
     
-    logger.info(f"\n EDA Complete - Generated {len(eda_results['plots'])} plots")
+    logger.info(f"\n EDA Complete - Generated {len(eda_results['plots'])} plots in {eda_results.get('run_folder', 'plots')}")
     
     return {
         'eda_results': eda_results,
-        'kpis': kpis
+        'kpis': kpis,
+        'run_id': run_id
     }
 
 
@@ -225,8 +232,7 @@ def step_4_baseline_model(X_train, X_test, y_train, y_test):
     Returns:
         Dictionary with baseline model results
     """
-    from src.models.regressors import LinearRegressionModel, FeatureImportancePlotter
-    from src.models.base_model import ModelEvaluator
+    from src.models.regressors import LinearRegressionModel
     
     logger.info("\n" + "=" * 70)
     logger.info("STEP 4: BASELINE MODEL DEVELOPMENT")
@@ -245,19 +251,8 @@ def step_4_baseline_model(X_train, X_test, y_train, y_test):
     logger.info("\n Running cross-validation...")
     cv_results = baseline.cross_validate(X_train, y_train)
     
-    # Generate evaluation plots
-    evaluator = ModelEvaluator(save_plots=True)
+    # Get predictions for metrics display (no separate plots - these will be included in model comparison)
     y_pred = baseline.predict(X_test)
-    eval_report = evaluator.generate_evaluation_report(
-        y_test.values if hasattr(y_test, 'values') else y_test,
-        y_pred,
-        "Linear Regression",
-        n_features=X_train.shape[1]
-    )
-    
-    # Plot coefficients
-    plotter = FeatureImportancePlotter(save_plots=True)
-    plotter.plot_linear_coefficients(baseline, top_n=15)
     
     logger.info("\n Baseline Model Results:")
     logger.info(f"  - R²: {metrics['R2']:.4f}")
@@ -265,35 +260,31 @@ def step_4_baseline_model(X_train, X_test, y_train, y_test):
     logger.info(f"  - RMSE: {metrics['RMSE']:,.2f}")
     logger.info(f"  - CV R² (mean): {cv_results['R2_mean']:.4f} ± {cv_results['R2_std']:.4f}")
     
-    # Key findings
-    logger.info("\n Key Findings from Baseline:")
-    coef_df = baseline.get_coefficients()
-    logger.info("  Top 5 Most Influential Features:")
-    for _, row in coef_df.head(5).iterrows():
-        direction = "↑" if row['Coefficient'] > 0 else "↓"
-        logger.info(f"    {direction} {row['Feature']}: {row['Coefficient']:.4f}")
-    
     return {
         'model': baseline,
         'metrics': metrics,
-        'cv_results': cv_results,
-        'eval_report': eval_report
+        'cv_results': cv_results
     }
 
 
 def step_5_advanced_modeling(
     X_train, X_test, y_train, y_test,
-    tune_hyperparameters: bool = True
+    tune_hyperparameters: bool = True,
+    run_id: str = None
 ):
     """
     Step 5: Advanced Modeling & Optimization.
     
     Train multiple models, tune hyperparameters, and compare performance.
+    Generates 2 of 6 required visualizations:
+    - Feature Importance Plot (Plot 5)
+    - Predicted vs Actual Fares (Plot 6)
     
     Args:
         X_train, X_test: Training and test features
         y_train, y_test: Training and test targets
         tune_hyperparameters: Whether to tune hyperparameters
+        run_id: Unique identifier for this pipeline run
     
     Returns:
         Dictionary with all model results
@@ -363,10 +354,10 @@ def step_5_advanced_modeling(
     
     # Compare all models
     logger.info("\n Step 5.3: Model Comparison")
-    comparison = ModelComparison(models=models)
+    comparison = ModelComparison(models=models, run_id=run_id)
     comparison_results = comparison.run_full_comparison(
         X_train, X_test, y_train, y_test,
-        run_cv=True
+        run_cv=False  # Skip CV for faster iteration
     )
     
     # Print comparison table
@@ -380,14 +371,28 @@ def step_5_advanced_modeling(
         print("\nCross-Validation Performance:")
         print(comparison_results['cv_results'].to_string(index=False))
     
-    # Feature importance for best tree-based model
+    # Feature importance for best model only (Plot 5: Feature Importance)
     logger.info("\n Step 5.4: Feature Importance Analysis")
-    plotter = FeatureImportancePlotter(save_plots=True)
+    plotter = FeatureImportancePlotter(save_plots=True, run_id=run_id)
     
-    # Plot for tree-based models
-    for model_name in ['Random Forest', 'Gradient Boosting', 'XGBoost']:
-        if model_name in models and models[model_name].is_fitted:
-            plotter.plot_tree_feature_importance(models[model_name], top_n=15)
+    # Determine best tree-based model from results
+    best_model_name = comparison_results['test_results'].iloc[0]['Model']
+    
+    # Plot feature importance only for best model (or best tree-based if linear is best)
+    tree_models = ['Random Forest', 'Gradient Boosting', 'XGBoost', 'Decision Tree']
+    if best_model_name in tree_models and best_model_name in models:
+        plotter.plot_tree_feature_importance(models[best_model_name], top_n=15)
+    else:
+        # If best model is linear, plot coefficients for it, and importance for best tree model
+        for model_name in tree_models:
+            if model_name in models and models[model_name].is_fitted:
+                plotter.plot_tree_feature_importance(models[model_name], top_n=15)
+                break  # Only plot for one tree model
+    
+    # Also plot coefficients for best linear model if applicable
+    linear_models = ['Linear Regression', 'Ridge Regression', 'Lasso Regression']
+    if best_model_name in linear_models:
+        plotter.plot_linear_coefficients(models[best_model_name], top_n=15)
     
     return {
         'models': models,
@@ -506,7 +511,13 @@ def run_full_pipeline(
     logger.info(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("=" * 70)
     
-    pipeline_results = {}
+    # Generate unique run ID for this pipeline execution
+    # All plots for this run will be saved in outputs/plots/run_{run_id}/
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    logger.info(f"Run ID: {run_id}")
+    logger.info(f"All visualizations will be saved to: {PLOTS_DIR / f'run_{run_id}'}")
+    
+    pipeline_results = {'run_id': run_id}
     
     try:
         # Step 1: Load and understand data
@@ -525,19 +536,20 @@ def run_full_pipeline(
             'df_processed': df_processed
         }
         
-        # Step 3: EDA
+        # Step 3: EDA (generates 4 of 6 visualizations)
         if not skip_eda:
-            step3_results = step_3_exploratory_data_analysis(df_processed)
+            step3_results = step_3_exploratory_data_analysis(df_processed, run_id=run_id)
             pipeline_results['step3'] = step3_results
         
         # Step 4: Baseline model
         step4_results = step_4_baseline_model(X_train, X_test, y_train, y_test)
         pipeline_results['step4'] = step4_results
         
-        # Step 5: Advanced modeling
+        # Step 5: Advanced modeling (generates 2 of 6 visualizations)
         step5_results = step_5_advanced_modeling(
             X_train, X_test, y_train, y_test,
-            tune_hyperparameters=tune_hyperparameters
+            tune_hyperparameters=tune_hyperparameters,
+            run_id=run_id
         )
         pipeline_results['step5'] = step5_results
         
