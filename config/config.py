@@ -47,7 +47,6 @@ class DataConfig:
     ])
     
     # Numerical columns for scaling
-    # (Base Fare and Tax removed to prevent data leakage)
     numerical_columns: List[str] = field(default_factory=lambda: [
         "Duration (hrs)", "Days Before Departure"
     ])
@@ -103,10 +102,11 @@ class ModelConfig:
     })
     
     gradient_boosting_params: Dict[str, List[Any]] = field(default_factory=lambda: {
-        "n_estimators": [50, 100],
-        "max_depth": [3, 5],
-        "learning_rate": [0.1, 0.2],
-        "subsample": [0.8, 1.0]
+        "n_estimators": [100, 150], # number of trees built sequentially
+        "max_depth": [4, 5], #How deep each tree is allowd to grow
+        "learning_rate": [0.05, 0.1], #How much each new tree corrects previous errors
+        "subsample": [0.8], #Each tree seees only 80% of the data randomly
+        "min_samples_leaf": [3] #forces tres to generalize
     })
 
 
