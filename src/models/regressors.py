@@ -802,24 +802,27 @@ class FeatureImportancePlotter:
     across different model types.
     """
     
-    def __init__(self, save_plots: bool = True, plot_dir: Path = None):
+    def __init__(self, save_plots: bool = True, plot_dir: Path = None, run_id: str = None):
         """
         Initialize FeatureImportancePlotter.
         
         Args:
             save_plots: Whether to save plots to disk
-            plot_dir: Directory for saving plots
+            plot_dir: Directory for saving plots (should be run-specific folder)
+            run_id: Run identifier for folder organization
         """
         self.save_plots = save_plots
-        self.plot_dir = plot_dir or PLOTS_DIR
+        self.run_id = run_id or datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Use run subfolder
+        base_dir = plot_dir or PLOTS_DIR
+        self.plot_dir = base_dir / f"run_{self.run_id}"
         self.plot_dir.mkdir(parents=True, exist_ok=True)
-        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        logger.info("FeatureImportancePlotter initialized")
+        logger.info(f"FeatureImportancePlotter initialized, saving to: {self.plot_dir}")
     
     def _save_figure(self, fig: plt.Figure, name: str) -> Optional[Path]:
-        """Save figure to disk."""
+        """Save figure to disk (no timestamp in filename since folder has it)."""
         if self.save_plots:
-            filename = f"{name}_{self.timestamp}.png"
+            filename = f"{name}.png"
             filepath = self.plot_dir / filename
             fig.savefig(filepath, dpi=FIGURE_DPI, bbox_inches='tight',
                        facecolor='white', edgecolor='none')
@@ -1018,7 +1021,8 @@ def get_all_models(random_state: int = None) -> Dict[str, BaseRegressor]:
     else:
         logger.warning("XGBoost not installed — skipping. Install with: pip install xgboost")
     
-    # Add Stacking Ensemble
-    models['Stacking Ensemble'] = StackingRegressorModel(random_state=random_state)
+    # Stacking Ensemble disabled for faster training
+    # Uncomment if you want ensemble of all models (very slow)
+    # models['Stacking Ensemble'] = StackingRegressorModel(random_state=random_state)
     
     return models
