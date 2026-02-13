@@ -1,16 +1,4 @@
-"""
-Base Model and Evaluation Module.
-
-This module provides base classes for all regression models and
-comprehensive evaluation utilities.
-
-Industry Standard Justifications:
-- Abstract base class ensures consistent interface across all models
-- Model serialization using joblib for production deployment
-- Comprehensive metrics suite for thorough model evaluation
-- Residual analysis for model diagnostics
-- Cross-validation support for robust performance estimation
-"""
+#Base Model and Evaluation Module.
 
 import numpy as np
 import pandas as pd
@@ -56,13 +44,9 @@ class BaseRegressor(ABC):
     """
     
     def __init__(self, model_name: str = "BaseRegressor", random_state: int = None):
-        """
-        Initialize BaseRegressor.
         
-        Args:
-            model_name: Name for the model
-            random_state: Random seed for reproducibility
-        """
+        # Initialize BaseRegressor.
+        
         self.model_name = model_name
         self.random_state = random_state or model_config.random_state
         self.model = None
@@ -81,16 +65,10 @@ class BaseRegressor(ABC):
         X: Union[pd.DataFrame, np.ndarray], 
         y: Union[pd.Series, np.ndarray]
     ) -> 'BaseRegressor':
-        """
-        Fit the model to training data.
+    
+       #  Fit the model to training data.
         
-        Args:
-            X: Training features
-            y: Training target
         
-        Returns:
-            self
-        """
         logger.info(f"Training {self.model_name}...")
         
         if self.model is None:
@@ -109,15 +87,9 @@ class BaseRegressor(ABC):
         return self
     
     def predict(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
-        """
-        Make predictions on new data.
         
-        Args:
-            X: Features for prediction
+       # Make predictions on new data.
         
-        Returns:
-            Predicted values
-        """
         if not self.is_fitted:
             raise ValueError(f"{self.model_name} must be fitted before prediction")
         
@@ -128,16 +100,9 @@ class BaseRegressor(ABC):
         X: Union[pd.DataFrame, np.ndarray], 
         y: Union[pd.Series, np.ndarray]
     ) -> Dict[str, float]:
-        """
-        Evaluate model performance.
         
-        Args:
-            X: Test features
-            y: True target values
+        # Evaluate model performance.
         
-        Returns:
-            Dictionary of evaluation metrics
-        """
         y_pred = self.predict(X)
         
         metrics = {
@@ -160,17 +125,9 @@ class BaseRegressor(ABC):
         y: Union[pd.Series, np.ndarray],
         cv: int = None
     ) -> Dict[str, Any]:
-        """
-        Perform cross-validation.
         
-        Args:
-            X: Features
-            y: Target
-            cv: Number of folds (defaults to config)
+       # Perform cross-validation.
         
-        Returns:
-            Cross-validation results
-        """
         cv = cv or model_config.cv_folds
         
         logger.info(f"Running {cv}-fold cross-validation for {self.model_name}...")
@@ -210,15 +167,9 @@ class BaseRegressor(ABC):
         return results
     
     def save_model(self, filepath: Path = None) -> Path:
-        """
-        Save the trained model to disk.
         
-        Args:
-            filepath: Path to save the model
+       # Save the trained model to disk.
         
-        Returns:
-            Path to saved model
-        """
         if not self.is_fitted:
             raise ValueError(f"{self.model_name} must be fitted before saving")
         
@@ -241,15 +192,9 @@ class BaseRegressor(ABC):
         return filepath
     
     def load_model(self, filepath: Path) -> 'BaseRegressor':
-        """
-        Load a trained model from disk.
         
-        Args:
-            filepath: Path to the saved model
+        # Load a trained model from disk.
         
-        Returns:
-            self
-        """
         model_data = joblib.load(filepath)
         
         self.model = model_data['model']
@@ -277,13 +222,9 @@ class ModelEvaluator:
     """
     
     def __init__(self, save_plots: bool = True, plot_dir: Path = None):
-        """
-        Initialize ModelEvaluator.
         
-        Args:
-            save_plots: Whether to save plots to disk
-            plot_dir: Directory for saving plots
-        """
+       # Initialize ModelEvaluator.
+       
         self.save_plots = save_plots
         self.plot_dir = plot_dir or PLOTS_DIR
         self.plot_dir.mkdir(parents=True, exist_ok=True)
@@ -308,16 +249,9 @@ class ModelEvaluator:
         y_true: np.ndarray, 
         y_pred: np.ndarray
     ) -> Dict[str, float]:
-        """
-        Compute comprehensive evaluation metrics.
         
-        Args:
-            y_true: True target values
-            y_pred: Predicted values
+       # Compute comprehensive evaluation metrics.
         
-        Returns:
-            Dictionary of metrics
-        """
         metrics = {
             'R2': r2_score(y_true, y_pred),
             'Adjusted_R2': None,  # Needs n_features, computed separately if needed
@@ -342,17 +276,10 @@ class ModelEvaluator:
         n_samples: int, 
         n_features: int
     ) -> float:
-        """
-        Compute adjusted R² score.
         
-        Args:
-            r2: R² score
-            n_samples: Number of samples
-            n_features: Number of features
+        # Compute adjusted R² score.
         
-        Returns:
-            Adjusted R² score
-        """
+       
         if n_samples - n_features - 1 <= 0:
             return r2
         return 1 - (1 - r2) * (n_samples - 1) / (n_samples - n_features - 1)
@@ -363,17 +290,9 @@ class ModelEvaluator:
         y_pred: np.ndarray,
         model_name: str = "Model"
     ) -> Optional[Path]:
-        """
-        Plot actual vs predicted values scatter plot.
         
-        Args:
-            y_true: True target values
-            y_pred: Predicted values
-            model_name: Name of the model for title
-        
-        Returns:
-            Path to saved plot
-        """
+       # Plot actual vs predicted values scatter plot.
+       
         logger.info("Generating actual vs predicted plot...")
         
         fig, ax = plt.subplots(figsize=(10, 8))
@@ -412,17 +331,9 @@ class ModelEvaluator:
         y_pred: np.ndarray,
         model_name: str = "Model"
     ) -> Optional[Path]:
-        """
-        Generate residual diagnostic plots.
         
-        Args:
-            y_true: True target values
-            y_pred: Predicted values
-            model_name: Name of the model for title
-        
-        Returns:
-            Path to saved plot
-        """
+       # Generate residual diagnostic plots.
+       
         logger.info("Generating residual diagnostic plots...")
         
         residuals = y_true - y_pred
@@ -485,17 +396,9 @@ class ModelEvaluator:
         y_pred: np.ndarray,
         model_name: str = "Model"
     ) -> Optional[Path]:
-        """
-        Plot prediction error distribution.
         
-        Args:
-            y_true: True target values
-            y_pred: Predicted values
-            model_name: Name of the model for title
-        
-        Returns:
-            Path to saved plot
-        """
+        # Plot prediction error distribution.
+       
         logger.info("Generating prediction error plot...")
         
         errors = y_true - y_pred
@@ -536,18 +439,9 @@ class ModelEvaluator:
         model_name: str,
         n_features: int = None
     ) -> Dict[str, Any]:
-        """
-        Generate complete evaluation report with metrics and plots.
         
-        Args:
-            y_true: True target values
-            y_pred: Predicted values
-            model_name: Name of the model
-            n_features: Number of features (for adjusted R²)
+       # Generate complete evaluation report with metrics and plots.
         
-        Returns:
-            Dictionary containing metrics and plot paths
-        """
         logger.info(f"Generating evaluation report for {model_name}...")
         
         report = {
@@ -587,16 +481,9 @@ class ModelEvaluator:
         metrics: Dict[str, float], 
         model_name: str = "Model"
     ) -> pd.DataFrame:
-        """
-        Format metrics as a clean DataFrame.
         
-        Args:
-            metrics: Dictionary of metrics
-            model_name: Name of the model
+        # Format metrics as a clean DataFrame.
         
-        Returns:
-            Formatted DataFrame
-        """
         df = pd.DataFrame({
             'Metric': list(metrics.keys()),
             'Value': list(metrics.values())
